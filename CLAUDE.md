@@ -154,7 +154,7 @@ Shapes and layout:
 
 ## 11. Progress Log
 - [x] Phase 1 — Environment, project setup, theme, app shell
-- [ ] Phase 2 — Telemetry simulator + Edge AI engine + tests
+- [x] Phase 2 — Telemetry simulator + Edge AI engine + tests
 - [ ] Phase 3 — Dashboard + Vitals screens
 - [ ] Phase 4 — Nutrition loop + security + Mission Log
 - [ ] Phase 5 — Demo Control, icons, GitHub Actions APK, README, final QA
@@ -171,3 +171,14 @@ Notes:
   - EarthLinkController (app/state): bounded random walk of the Mars delay, 4–24 min, ticks every 3 s.
   - core/constants/thresholds.dart already holds the section-4 threshold values (scaffold for Phase 2).
   - The widget test renders at 390x844 and fails on any overflow. A manual check at phone size in Chrome DevTools is still worth doing.
+- 2026-11-11 Phase 2 done. No new packages.
+  - Layer 1 (layers/telemetry): TelemetrySource (abstract, has stream()), SimulatedSource, ReplaySource + ReplayParser (JSON array / {readings:[]} / CSV with ; , tab; column aliases; °F→°C; SpO2 fraction→%; bad rows skipped), TelemetryController (history, scenario, source, interval, resetSession with sessionId, broadcast `readings` stream). Scenario targets in scenario_profiles.dart.
+  - Drift: a scenario switch starts a 90 s smoothstep ramp from current values (not an exponential ease, which crossed thresholds within ~15 s and hid the WATCH stage). Noise = bounded AR(1). HR follows activity with a 20 s ease. Reset session also resets the scenario to NOMINAL.
+  - Replay: uses the first non-sample .json/.csv in assets/data/nasa/ (via AssetManifest), else sample_replay.json (60 synthetic readings, 1 min apart: nominal → slow SpO2 drop → recovery). Readings are re-stamped with now and the file loops.
+  - Layer 2 (layers/engine): EdgeEngine (pure Dart), AdaptiveBaseline (EMA, alpha 0.3 for the first 5 calm readings, then 0.05; learns only from calm readings), MetricScale/RiskScoring, TrendAnalyzer (linear regression), EngineController. All numbers in core/constants/engine_constants.dart and thresholds.dart.
+  - Severity scale: approach→0, warning→0.5, critical→1.0, max 1.5. Score points 0/40/70/100 match the status bands NORMAL <40, WARNING 40–69, CRITICAL ≥70. Score = worst risk + 25% × weighted other risks. Combined rules with only part of their supporting signals are multiplied by 0.8 ("one notch lower"). A WATCH prediction = rising trend + warning expected within 10 min.
+  - Thresholds file gained "approach" values (start of the watch zone) and supporting-signal values (fatigueHrHigh 110, hrElevatedRatio 15%, nutritionHrvMarker 10%). Still general physiology, to be checked against NASA references.
+  - Energy (layers/nutrition/energy_balance_service.dart): burn 1.2 / 3.5 / 6.0 kcal/min (low/moderate/high), planned menu covers 2.0 kcal/min, demo time ×60 (1 s = 1 mission min). Deficit is floored at 0. The NUTRITION_DEFICIT scenario sets mealsSkipped, so the menu covers nothing. Without this, every active scenario built a deficit and NUTRITION_DEFICIT overtook the scenario's own risk. addIntake(kcal) is ready for Phase 4.
+  - Temporary debug view: features/dashboard/engine_debug_view.dart (scenario dropdown, interval, source, reset, "+600 kcal" test meal, live reading, score, baseline, predictions with Why). It gets replaced in Phase 3/5.
+  - Tests: 59 passing, including end-to-end runs of each scenario with seeded randoms, and NOMINAL/RECOVERY checked over 10 minutes × 5 seeds for false alarms. Shared helpers in test/helpers.dart.
+  - Known: SegmentedButton uses the theme's secondary (info blue) for its selected segment. That is fine for the temporary view; Phase 5 Demo Control should style it orange.
