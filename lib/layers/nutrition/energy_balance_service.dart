@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/energy_constants.dart';
+import '../../core/constants/thresholds.dart';
+import '../../core/models/engine_result.dart';
 import '../../core/models/vital_reading.dart';
 
 /// Tracks the astronaut's energy balance (Layer 3 input to the engine).
@@ -21,6 +23,7 @@ class EnergyBalanceService extends ChangeNotifier {
   double _deficit = 0;
   double _totalExpenditure = 0;
   double _totalIntake = 0;
+  double _totalPlanned = 0;
   double _missionMinutes = 0;
 
   /// Current energy deficit in kcal (0 = covered).
@@ -31,6 +34,19 @@ class EnergyBalanceService extends ChangeNotifier {
 
   /// Total kcal logged by the astronaut this session.
   double get totalIntakeKcal => _totalIntake;
+
+  /// Total kcal covered by the scheduled mission menu this session.
+  double get totalPlannedKcal => _totalPlanned;
+
+  /// Everything eaten this session: planned menu + logged meals.
+  double get totalEatenKcal => _totalPlanned + _totalIntake;
+
+  /// Deficit judged against the section-4 thresholds (500 / 900 kcal).
+  RiskStatus get deficitStatus {
+    if (_deficit > Thresholds.energyDeficitCritical) return RiskStatus.critical;
+    if (_deficit > Thresholds.energyDeficitWarning) return RiskStatus.warning;
+    return RiskStatus.normal;
+  }
 
   /// Simulated mission time covered by this session (minutes).
   double get missionMinutes => _missionMinutes;
@@ -60,11 +76,12 @@ class EnergyBalanceService extends ChangeNotifier {
 
     _missionMinutes += minutes;
     _totalExpenditure += burned;
+    _totalPlanned += planned;
     _deficit = max(0, _deficit + burned - planned);
     notifyListeners();
   }
 
-  /// Logs eaten calories (Phase 4: meal × consumption %). Reduces the deficit;
+  /// Logs eaten calories (meal kcal × consumption %). Reduces the deficit;
   /// the engine sees the change on the next reading.
   void addIntake(double kcal) {
     if (kcal <= 0) return;
@@ -77,6 +94,7 @@ class EnergyBalanceService extends ChangeNotifier {
     _deficit = 0;
     _totalExpenditure = 0;
     _totalIntake = 0;
+    _totalPlanned = 0;
     _missionMinutes = 0;
     notifyListeners();
   }

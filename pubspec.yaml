@@ -62,3 +62,23 @@ flutter:
     - family: Roboto
       fonts:
         - asset: assets/fonts/IBMPlexSans-Regular.ttf
+
+# App icons (run: dart run flutter_launcher_icons). The source PNGs live in
+# assets/icon/ and are NOT bundled in the app (not in the assets list above):
+# they are only read by the icon generator.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  # Legacy (pre-Android 8) launcher icon and the web icons: the full logo.
+  image_path: "assets/icon/app_icon.png"
+  # Adaptive icon (Android 8+). WHY a separate, padded foreground: the logo
+  # artwork reaches the bottom edge of the square, and launchers cut adaptive
+  # icons with a circle / squircle mask. app_icon_foreground.png already has
+  # the artwork scaled inside the central 66% safe zone, so nothing is cut.
+  adaptive_icon_background: "#111011"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#121314"
+    theme_color: "#E8743B"

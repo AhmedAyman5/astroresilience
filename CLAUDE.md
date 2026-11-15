@@ -3,9 +3,12 @@
 Read this file fully before every task. It is the single source of truth for this project.
 
 ## 1. Context
-- NASA Space Apps hackathon (6th of October, Egypt) — Health & Science. Demo MVP, built in ~2 days.
+- NASA Space Apps Challenge 2026 (6th of October, Egypt). Challenge: Health Monitoring Software (astronaut health). Demo MVP. Hackathon ends 2026-11-15.
 - Owner: Ahmed. He does NOT know Flutter. Work autonomously, keep code simple and well commented, never leave the project in a broken state.
 - Product: an offline "edge" system that helps an astronaut stay healthy on long missions (e.g. Mars) when the Earth link is delayed or lost. It monitors vitals from (simulated) smart patches, predicts risks before they happen, recommends nutrition and rest, records what the astronaut did, and adapts its recommendations.
+- Users: ASTRONAUTS ONLY. No patient mode, no explorer mode, no diseases, no medications. This line wins over anything else.
+- Data: there is NO NASA dataset for this challenge. The app runs on the built-in telemetry simulator with selectable scenarios (Demo Control). The NASA Replay source stays as a ready feature for real data; its bundled sample file is SIMULATED and labeled as simulated in the UI and docs.
+- Knowledge sources (articles, not data): NASA HRP "5 Hazards of Human Spaceflight", "Risks of Human Spaceflight", "Ongoing HRP Research in Space"; CSA "Monitoring Radiation for Astronaut Health", "Why Do We Conduct Science Experiments in Space?".
 - Pitch line: "It doesn't just monitor — it predicts, recommends, and learns."
 
 ## 2. Non-negotiable constraints
@@ -30,7 +33,7 @@ lib/
 
 assets/
 - data/foods.json — space food database
-- data/nasa/ — real NASA data for replay (README placeholder until data arrives)
+- data/nasa/ — replay folder. sample_replay.json is a SIMULATED sample (no NASA dataset exists for this challenge). A real NASA file dropped here later is preferred automatically.
 - fonts/ — IBM Plex Sans + IBM Plex Mono TTFs
 - images/logo.png
 
@@ -123,7 +126,7 @@ Shapes and layout:
 - Tab 2 Vitals: one line chart per vital with dashed threshold lines; range toggle (2 min / 10 min / session).
 - Tab 3 Nutrition: active recommendations with reasons; food cards with macros; bottom sheet to pick 100/75/50/25% and log; energy balance bar; searchable full list.
 - Tab 4 Mission Log: timeline of status changes, predictions and meals (newest first, mono timestamps); export log as JSON in a dialog with copy button.
-- Demo Control: scenario selector, data source toggle (Simulated / NASA Replay), interval selector, reset session, security status + wipe data, short "About: 5-layer architecture".
+- Demo Control: scenario selector, data source toggle (Simulated / NASA Replay; the bundled replay sample is labeled SIMULATED SAMPLE), interval selector, reset session, security status + wipe data, short "About: 5-layer architecture".
 
 ## 7. Coding conventions
 - Null-safe Dart, small widgets, const constructors where possible.
@@ -156,8 +159,10 @@ Shapes and layout:
 - [x] Phase 1 — Environment, project setup, theme, app shell
 - [x] Phase 2 — Telemetry simulator + Edge AI engine + tests
 - [x] Phase 3 — Dashboard + Vitals screens
-- [ ] Phase 4 — Nutrition loop + security + Mission Log
-- [ ] Phase 5 — Demo Control, icons, GitHub Actions APK, README, final QA
+- [x] Phase 4A — Nutrition loop + Mission Log (in-memory storage behind an interface)
+- [x] Phase 4B — Security: encrypted Hive, key in flutter_secure_storage, wipe
+- [x] Phase 5 — App icon, GitHub Actions APK, Demo Control polish, README
+- [x] Phase 6 — NASA/CSA References screen + hazard tags, final QA
 
 Notes:
 - (Claude Code adds dated notes here: decisions, package versions, Flutter version, known issues.)
@@ -194,3 +199,39 @@ Notes:
   - layers/nutrition/action_advisor.dart: non-food action per risk (rest / hydrate / reduce activity / breathing / routine). Phase 4 builds on it.
   - Tests: 67 passing. widget_test renders Mission + Vitals at 390x844 with NOMINAL, then HYPOXIA_EVENT for 3 min. It scrolls every list and fails on any overflow. New test/ui/vital_analysis_test.dart.
   - Chrome check (build/web on localhost): no app console errors and no network requests.
+- 2026-11-15 Stage 0 done: CLAUDE.md + assets/data/nasa/README.md updated (astronauts only, no NASA dataset, replay sample is SIMULATED, knowledge sources).
+- 2026-11-15 Phase 4A done. No new packages.
+  - assets/data/foods.json: 26 ISS-inspired foods (approximate values, disclaimer under the list). Every mapped tag is on 3+ foods. Food model in core/models/food.dart.
+  - LogStore interface + InMemoryLogStore (layers/security/log_store.dart). Entries are JSON maps (no TypeAdapters). The store is created in one place (main.dart); AstroResilienceApp(store:) falls back to memory only.
+  - MissionLogController (layers/log/ — new folder, the log is shared by Layers 3/4/5). Logs changes only: status (new AlertLevel confirmed on 2 readings, LogConstants.statusConfirmReadings), prediction (new risk or higher severity; a risk is "closed" after 3 absent readings), meal, system (scenario / source / reset, marked simulated). Max 500 entries. Reset session keeps the log. Timestamps are full ISO 8601 with ms.
+  - Meal history = the meal entries of the log (one source of truth, so Wipe clears history + preferences together).
+  - FoodRecommender (pure Dart): tag score (weights in core/constants/nutrition_constants.dart) × preference factor (0.5 + 0.5 × average fraction eaten; never eaten = 1.0). Ties by food id. Max 2 recommendations × 3 foods + ActionAdvisor action.
+  - NutritionController: logMeal → EnergyBalanceService.addIntake → Mission Log (store) → preferences. Demo Control "+600 kcal" uses logTestMeal (same path, no food id, does not teach preferences).
+  - EnergyBalanceService gained totalPlannedKcal / totalEatenKcal / deficitStatus.
+  - Nutrition tab: energy card (bar with 500/900 marks), recommendations or "No active risk" routine card, searchable food cards, bottom sheet 100/75/50/25 % + snackbar. Mission Log tab: filters All/Alerts/Meals/System, expandable Why?, Export JSON dialog (Copy/Close).
+  - Test gotcha: an indeterminate progress indicator in an offstage IndexedStack tab keeps ticking, and rootBundle caches across widget tests. Foods load with cache:false and the tab shows static "Loading…" text.
+  - Tests: 81 passing (new test/nutrition/nutrition_test.dart; widget test 2 runs NUTRITION_DEFICIT → log 75 % via the sheet → Log filters → Export at 390x844).
+- 2026-11-15 Phase 4B done. No new packages.
+  - EncryptedLogStore (layers/security/encrypted_log_store.dart): Hive box "mission_log_secure" opened with HiveAesCipher; 256-bit key from Hive.generateSecureKey(), stored base64 in flutter_secure_storage; entries are JSON strings keyed by id.
+  - SecurityService: mode ENCRYPTED / MEMORY_ONLY, stored entry count, wipeLocalData() (clears box + log → meal history and preferences follow). The key is KEPT on wipe (the box is empty, so rotating adds risk for no gain); uninstall / clearing site data removes it.
+  - main.dart: openLogStore() with a 5 s timeout and try/catch → InMemoryLogStore on any failure. AstroResilienceApp(store:, storeError:). Tests pass InMemoryLogStore.
+  - UI: Demo Control Security card (status, entry count, Wipe with confirm dialog, red only on the confirm button, snackbar). Mission Log chip "AES-256 · ON DEVICE" / "MEMORY ONLY".
+  - Android: effective minSdk is already 24 (Flutter default, flutter_secure_storage needs 23+), not changed. android:allowBackup="false" added with a comment.
+  - Verified in Chrome (build/web on localhost): the chip shows AES-256 · ON DEVICE, so secure storage + Hive work on web.
+  - Tests: 84 passing (wipe test, open-failure and open-timeout fallback tests).
+- 2026-11-15 Phase 5 done (with one open item: icon files).
+  - ICON DECISION: pubspec has the flutter_launcher_icons config (android true, ios false, image_path assets/icon/app_icon.png, adaptive background #111011, adaptive foreground assets/icon/app_icon_foreground.png padded for the safe zone, web generate with background #121314 / theme #E8743B). assets/icon/ is NOT in the flutter assets list.
+  - OPEN: assets/icon/app_icon.png and app_icon_foreground.png were NOT in the project, so `dart run flutter_launcher_icons` was NOT run (we do not create or resize them). The app still has the default Flutter launcher icons. Fix: put the two files in assets/icon/ and run `dart run flutter_launcher_icons`. The CI workflow also runs it automatically when both files exist.
+  - web/manifest.json theme_color #E8743B, description updated (index.html too). Title stays AstroResilience.
+  - .github/workflows/build-apk.yml: push to main + workflow_dispatch, ubuntu-latest, checkout@v4, setup-java@v4 temurin 17 (AGP 9.1 / Gradle 9.3 need 17+), subosito/flutter-action@v2 Flutter 3.47.9 stable cache, pub get, conditional icon generation, analyze, test, build apk --release (debug key), upload-artifact@v4 "astroresilience-apk". YAML checked by parsing it with package:yaml; it has not run on GitHub yet.
+  - Demo Control order: Scenario, Telemetry, Session, Security, About (5 layers + "No network · No backend · No login" + References tile). Replay of sample_replay.json shows chip SIMULATED SAMPLE + explanation (ReplaySource.isSimulatedSample).
+  - README.md rewritten (pitch, users, 5 layers, predict, learn, data honesty, web run, APK download, tests, privacy, credits).
+  - AstroResilienceApp gained simulatorSeed (tests only): the widget test uses seed 7, because the unseeded simulator made the "WATCH appears" check flaky (failed 1 run in ~5).
+- 2026-11-15 Phase 6 done.
+  - core/constants/hazard_constants.dart: risk → related NASA hazard + HRP risk (labeled "related", not an official classification) + app-wide Distance from Earth.
+  - HazardChip "NASA HAZARD · …" (ellipsis) + HrpRiskLine on the dashboard prediction card and each Nutrition recommendation.
+  - features/references/references_screen.dart (route /references from the About card): NASA HRP 3 articles, CSA 2 articles (radiation NOT monitored, dosimeter = planned extension), related-hazard table, footer about thresholds. Plain text, no links.
+  - Final QA: analyze 0 issues; 84 tests pass; flutter build web OK. Chrome walk on build/web (phone frame): Nominal → Fatigue onset (WARNING, CRITICAL) → Nutrition (Protein bar first, logged at 50%, "Ranked lower" appeared) → Log (status, prediction, meal) → F5 kept 11 encrypted entries → Hypoxia CRITICAL with hazard chip → Recovery NOMINAL → NASA Replay SIMULATED SAMPLE → References → Wipe (0 entries). No console errors; all app requests are localhost.
+  - Grep for patient / explorer / disease / medication in lib/, assets/, README: none.
+  - Known: near a band edge (score 69/70) the log can show WARNING ↔ CRITICAL changes a few seconds apart; confirmation is 2 readings (LogConstants.statusConfirmReadings), raise it to 3 if it looks noisy.
+  - dart format was only run on edited files; formatting-only changes to untouched files were reverted.

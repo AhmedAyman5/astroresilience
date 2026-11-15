@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_spacing.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../app/widgets/console_card.dart';
+import '../../../app/widgets/hazard_tag.dart';
 import '../../../app/widgets/risk_style.dart';
 import '../../../app/widgets/status_chip.dart';
 import '../../../core/models/alert_level.dart';
@@ -40,6 +41,11 @@ class _PredictionCardState extends State<PredictionCard> {
         children: [
           _PredictionHeader(prediction: top, large: true),
           const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: HazardChip(type: top.type),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           _PredictionMetrics(prediction: top),
           const SizedBox(height: AppSpacing.xs),
           _ToggleButton(
@@ -49,6 +55,7 @@ class _PredictionCardState extends State<PredictionCard> {
             onTap: () => setState(() => _showWhy = !_showWhy),
           ),
           if (_showWhy) _WhyList(reasons: top.why),
+          HrpRiskLine(type: top.type),
           if (others.isNotEmpty) ...[
             const Divider(height: AppSpacing.lg),
             _ToggleButton(

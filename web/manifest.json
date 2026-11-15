@@ -4,8 +4,8 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#121314",
-    "theme_color": "#121314",
-    "description": "AstroResilience OS — offline edge health system for astronauts.",
+    "theme_color": "#E8743B",
+    "description": "AstroResilience OS — offline edge health system that predicts risks, recommends nutrition and learns, for astronauts on long missions.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -10,8 +10,9 @@ network calls.
 - Real data files are preferred over `sample_replay.json`.
 - `sample_replay.json` is a bundled 60-reading demo file (1 minute apart):
   20 nominal minutes, a slow 25-minute SpO2 drop (hypoxia onset, down to
-  ~89%), then recovery. It is **synthetic**, made only so replay works before
-  real NASA data arrives.
+  ~89%), then recovery. It is **simulated** (synthetic). There is no NASA
+  dataset for this challenge; this sample only shows that replay works. A real
+  NASA file placed here later is replayed instead.
 
 ## Accepted formats
 1. JSON array of objects: `[{"timestamp": "...", "heart_rate": 78, ...}, ...]`

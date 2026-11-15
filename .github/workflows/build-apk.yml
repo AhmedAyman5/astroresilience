@@ -1,0 +1,67 @@
+# Builds the Android APK in the cloud (no Android SDK / Java on Ahmed's PC).
+# Runs on every push to main, or by hand: GitHub → Actions → "Build APK" →
+# "Run workflow". The APK is attached to the run as "astroresilience-apk".
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # The Android Gradle Plugin (9.1) and Gradle (9.3) used in android/
+      # need Java 17 or newer.
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Same Flutter version as on the dev machine (see CLAUDE.md Progress Log).
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.9"
+          cache: true
+
+      - name: Get packages
+        run: flutter pub get
+
+      # Safety net: if the icon source files are committed but the generated
+      # launcher icons were not refreshed, generate them here. Skipped when
+      # assets/icon/ is missing (the default Flutter icon is used then).
+      - name: Generate launcher icons (if icon files exist)
+        run: |
+          if [ -f assets/icon/app_icon.png ] && [ -f assets/icon/app_icon_foreground.png ]; then
+            dart run flutter_launcher_icons
+          else
+            echo "assets/icon/ not found - keeping the current launcher icons."
+          fi
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      # Release build signed with the debug key (fine for a hackathon demo;
+      # see android/app/build.gradle.kts). Gradle wrapper files are
+      # git-ignored and regenerated here by Flutter.
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: astroresilience-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error

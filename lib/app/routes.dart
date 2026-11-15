@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/demo_control/demo_control_screen.dart';
+import '../features/references/references_screen.dart';
 import '../features/splash/splash_screen.dart';
 import 'shell/app_shell.dart';
 
@@ -12,10 +13,12 @@ class AppRoutes {
   static const String splash = '/';
   static const String shell = '/mission';
   static const String demoControl = '/demo-control';
+  static const String references = '/references';
 
   static Map<String, WidgetBuilder> get table => {
     splash: (_) => const SplashScreen(),
     shell: (_) => const AppShell(),
     demoControl: (_) => const DemoControlScreen(),
+    references: (_) => const ReferencesScreen(),
   };
 }

@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- allowBackup="false": the encrypted Mission Log must stay on this
+         device. Android cloud backup would copy the app data off the device
+         (and the Keystore key cannot be restored elsewhere anyway). -->
     <application
         android:label="AstroResilience"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -6,6 +6,9 @@ import 'package:astroresilience/core/constants/app_constants.dart';
 import 'package:astroresilience/core/constants/telemetry_constants.dart';
 import 'package:astroresilience/core/models/scenario.dart';
 import 'package:astroresilience/features/dashboard/widgets/risk_gauge.dart';
+import 'package:astroresilience/layers/engine/engine_controller.dart';
+import 'package:astroresilience/layers/log/mission_log_controller.dart';
+import 'package:astroresilience/layers/security/log_store.dart';
 import 'package:astroresilience/layers/telemetry/replay_source.dart';
 import 'package:astroresilience/layers/telemetry/telemetry_controller.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -23,7 +26,9 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(const AstroResilienceApp());
+      await tester.pumpWidget(
+        AstroResilienceApp(store: InMemoryLogStore(), simulatorSeed: 7),
+      );
       expect(find.text('Initializing edge engine…'), findsOneWidget);
 
       // Wait for the splash timer and the route transition.
@@ -78,7 +83,9 @@ void main() {
       final seen = <String>{};
       for (var i = 0; i < 36; i++) {
         await tester.pump(const Duration(seconds: 5));
-        seen.add(tester.widget<Text>(find.byKey(const Key('alertLabel'))).data!);
+        seen.add(
+          tester.widget<Text>(find.byKey(const Key('alertLabel'))).data!,
+        );
       }
       await tester.pumpAndSettle();
       expect(
@@ -92,6 +99,10 @@ void main() {
       await scrollThrough(tester, const Key('dashboardList'));
       expect(find.text('TOP PREDICTION'), findsOneWidget);
       expect(find.text('Hypoxia'), findsOneWidget);
+      // Related NASA hazard context on the prediction card.
+      expect(find.byKey(const Key('hazardChip')), findsWidgets);
+      expect(find.text('NASA HAZARD · CLOSED ENVIRONMENT'), findsWidgets);
+      expect(find.textContaining('Related HRP risk: '), findsWidgets);
       await tester.ensureVisible(find.byKey(const Key('whyToggle')));
       await tester.tap(find.byKey(const Key('whyToggle')));
       await tester.pumpAndSettle();
@@ -134,6 +145,165 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('Nutrition loop at 390x844: deficit → log a meal at 75% → '
+      'Mission Log → export, no overflow', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      AstroResilienceApp(store: InMemoryLogStore(), simulatorSeed: 7),
+    );
+    await tester.pump(AppConstants.splashDuration);
+    await tester.pumpAndSettle();
+
+    // Nutrition tab in the calm state first.
+    await tester.tap(find.text('Nutrition'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No active risk — follow the planned menu'),
+      findsOneWidget,
+    );
+    expect(find.text('ENERGY BALANCE · KCAL'), findsOneWidget);
+    await scrollThrough(tester, const Key('nutritionList'), steps: 30);
+    expect(find.byKey(const Key('foodDisclaimer')), findsOneWidget);
+    // Search narrows the list.
+    await tester.drag(
+      find.byKey(const Key('nutritionList')),
+      const Offset(0, 20000),
+    );
+    await tester.pumpAndSettle();
+
+    // Demo Control: NUTRITION_DEFICIT scenario.
+    await tester.tap(find.byTooltip('Demo Control'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scenarioDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nutrition deficit').last);
+    await tester.pumpAndSettle();
+    final engine = Provider.of<EngineController>(
+      tester.element(find.text('SCENARIO')),
+      listen: false,
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Readings until the engine predicts something.
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(seconds: 5));
+      if (engine.latest?.predictions.isNotEmpty ?? false) break;
+    }
+    await tester.pumpAndSettle();
+    expect(engine.latest!.predictions, isNotEmpty);
+
+    // Nutrition shows a recommendation with ranked foods.
+    await tester.drag(
+      find.byKey(const Key('nutritionList')),
+      const Offset(0, 20000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('TOP FOODS'), findsWidgets);
+    final logButton = find
+        .byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('logRanked_'),
+        )
+        .first;
+    await tester.ensureVisible(logButton);
+    await tester.pumpAndSettle();
+    await tester.tap(logButton);
+    await tester.pumpAndSettle();
+
+    // Bottom sheet: pick 75 % and log.
+    expect(find.text('HOW MUCH WAS EATEN?'), findsOneWidget);
+    await tester.tap(find.text('75%'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('kcalPreview')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirmLogMeal')));
+    await tester.pump();
+    expect(find.textContaining('· 75% · +'), findsOneWidget); // snackbar
+    await tester.pumpAndSettle();
+    await scrollThrough(tester, const Key('nutritionList'), steps: 30);
+
+    // Mission Log: the meal is there; every filter works.
+    await tester.tap(find.text('Log'));
+    await tester.pumpAndSettle();
+    final log = Provider.of<MissionLogController>(
+      tester.element(find.byKey(const Key('logList'))),
+      listen: false,
+    );
+    expect(log.mealEntries.single.data!['consumption_pct'], 75);
+    expect(find.textContaining('· 75%'), findsWidgets);
+    for (final f in ['alerts', 'meals', 'system', 'all']) {
+      await tester.tap(find.byKey(Key('logFilter_$f')));
+      await tester.pumpAndSettle();
+      await scrollThrough(tester, const Key('logList'));
+      await tester.drag(
+        find.byKey(const Key('logList')),
+        const Offset(0, 20000),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(
+      log.entries.where((e) => e.title == 'Scenario → Nutrition deficit'),
+      hasLength(1),
+    );
+
+    // Export dialog with Copy + Close.
+    await tester.tap(find.byKey(const Key('exportLog')));
+    await tester.pumpAndSettle();
+    expect(find.text('Mission Log · JSON'), findsOneWidget);
+    expect(find.byKey(const Key('exportJsonText')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('copyExport')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('closeExport')));
+    await tester.pumpAndSettle();
+    expect(find.text('Mission Log · JSON'), findsNothing);
+
+    // Demo Control: Security + About cards, then the References screen.
+    await tester.tap(find.byTooltip('Demo Control'));
+    await tester.pumpAndSettle();
+    final demoList = find.byType(Scrollable).last;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('securityStatus')),
+      200,
+      scrollable: demoList,
+    );
+    expect(find.text('Local data: memory only (not saved)'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('referencesTile')),
+      200,
+      scrollable: demoList,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('ABOUT · 5-LAYER ARCHITECTURE'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('referencesTile')));
+    await tester.pumpAndSettle();
+    expect(find.text('NASA HUMAN RESEARCH PROGRAM'), findsOneWidget);
+    await scrollThrough(tester, const Key('referencesList'));
+    expect(find.byKey(const Key('referencesFooter')), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Wipe local data through the confirm dialog: the log is emptied.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('wipeData')),
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wipeData')));
+    await tester.pumpAndSettle();
+    expect(find.text('Wipe local data?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirmWipe')));
+    await tester.pumpAndSettle();
+    expect(log.mealEntries, isEmpty);
+    expect(find.textContaining('Local data wiped'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
 
   test('Earth link delay stays within 4–24 minutes', () {
     final controller = EarthLinkController(
@@ -180,8 +350,12 @@ Future<void> pumpReadings(WidgetTester tester, int count) async {
 
 /// Scrolls a list from top to bottom in steps so every child gets built and
 /// laid out (an overflow anywhere fails the test), then back to the top.
-Future<void> scrollThrough(WidgetTester tester, Key list) async {
-  for (var i = 0; i < 12; i++) {
+Future<void> scrollThrough(
+  WidgetTester tester,
+  Key list, {
+  int steps = 12,
+}) async {
+  for (var i = 0; i < steps; i++) {
     await tester.drag(find.byKey(list), const Offset(0, -300));
     await tester.pumpAndSettle();
   }

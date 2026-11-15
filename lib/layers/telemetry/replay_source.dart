@@ -43,6 +43,11 @@ class ReplaySource extends TelemetrySource {
 
   bool get isLoaded => _readings.isNotEmpty;
 
+  /// True when the bundled SIMULATED sample is being replayed (there is no
+  /// NASA dataset for this challenge). The UI then shows "SIMULATED SAMPLE".
+  bool get isSimulatedSample =>
+      loadedAsset == TelemetryConstants.sampleReplayAsset;
+
   @override
   String get label => 'NASA Replay';
 
