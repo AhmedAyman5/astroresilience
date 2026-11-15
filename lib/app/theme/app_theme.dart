@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
 
-/// Builds the single dark "Pressure Suit" theme.
+/// Builds the single dark "Nile & Gold" theme.
 ///
 /// Rules from the design system: calm and precise, 1px borders instead of
 /// shadows, radius 12, no glows / gradients / glassmorphism.
@@ -78,7 +78,8 @@ class AppTheme {
         pressElevation: 0,
       ),
 
-      // Bottom navigation: active tab in International Orange.
+      // Bottom navigation: active tab in Egyptian gold, with a thin gold
+      // outline on the indicator (a small pharaonic accent).
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
@@ -87,6 +88,10 @@ class AppTheme {
         indicatorColor: AppColors.tint(AppColors.primary),
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+          side: BorderSide(
+            color: AppColors.goldLine,
+            width: AppSpacing.borderWidth,
+          ),
         ),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -128,7 +133,7 @@ class AppTheme {
       ),
 
       // Segmented toggles (range, interval, source): selected segment in a
-      // soft orange tint. Not info blue, because blue means WATCH.
+      // soft gold tint. Not info blue, because blue means WATCH.
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith(

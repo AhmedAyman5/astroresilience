@@ -91,23 +91,26 @@ General physiology values — the team will verify them against NASA medical ref
 - Key generated once, stored with flutter_secure_storage (Android + web).
 - UI shows "Local data: AES-256 encrypted" + a "Wipe local data" action.
 
-## 5. Design system — "Pressure Suit"
-Feel: calm, precise NASA mission-control console. Story: the primary color is International Orange, the color of NASA launch-and-entry pressure suits — the system protects the astronaut like the suit does.
+## 5. Design system — "Nile & Gold"
+Feel: calm, precise mission-control console with an Egyptian identity. Story: Nile blue, pharaonic gold, sun yellow, faience turquoise on black — the gold of the pharaohs' masks guards the astronaut, the Nile blue carries the data, faience turquoise means "all is well".
 
-Forbidden: neon glows, purple, cyan neon, gradient blobs, glassmorphism, heavy shadows.
+Forbidden: neon glows, purple, gradient blobs, glassmorphism, heavy shadows. (Turquoise is allowed as a calm accent, never neon.)
 
 Colors (dark theme only):
-- background #121314
-- surface #1A1C1E
-- surfaceRaised #222528
-- border #2E3236
-- textPrimary #ECE8E1
-- textSecondary #9B9A96
-- primary (brand, buttons, active nav) #E8743B
-- info (nutrition, charts secondary) #8DB4D6
-- normal #6FB38E
-- warning #F2C14E
+- background #0B0B0D (deep black)
+- surface #131A24 (black with a hint of Nile blue)
+- surfaceRaised #1A2433
+- border #26354A
+- textPrimary #F3EBD8 (warm papyrus white)
+- textSecondary #A79F8C
+- primary (brand, buttons, active nav) #D4A73A (Egyptian gold); onPrimary #0B0B0D
+- info (nutrition, charts secondary, WATCH) #3D7BC4 (light Nile blue; deep Nile #1F5FA8 = decoration only, too dark for text)
+- accent #30B5A6 (faience turquoise)
+- normal #30B5A6 (turquoise)
+- warning #F2C230 (sun yellow)
 - critical #E5484D
+
+Egyptian touches (keep it minimal): thin gold top line on cards, pyramid-line motif under the top bar. Light animations (lib/app/theme/app_motion.dart): cards fade + slide in once (250 ms), one gold shimmer on the splash logo. Every animation plays once and stops.
 
 Typography:
 - IBM Plex Sans for all UI text.
@@ -235,3 +238,4 @@ Notes:
   - Grep for patient / explorer / disease / medication in lib/, assets/, README: none.
   - Known: near a band edge (score 69/70) the log can show WARNING ↔ CRITICAL changes a few seconds apart; confirmation is 2 readings (LogConstants.statusConfirmReadings), raise it to 3 if it looks noisy.
   - dart format was only run on edited files; formatting-only changes to untouched files were reverted.
+- 2026-11-15 Re-skin "Nile & Gold" (visual only): new palette in app_colors.dart, app_motion.dart (card entrance, splash shimmer), gold card top line, pyramid motif in top bar, gold nav indicator outline, web theme/background colors. No logic, text, keys or tests changed. Written without a local Flutter SDK: Ahmed must run flutter analyze + flutter test.

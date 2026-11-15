@@ -5,7 +5,7 @@ import '../theme/app_colors.dart';
 /// The AstroResilience logo (assets/images/logo.png).
 ///
 /// If the image is missing or fails to load, we fall back to a plain
-/// International Orange circle so the app never shows a broken image.
+/// Egyptian gold circle so the app never shows a broken image.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, required this.size});
 

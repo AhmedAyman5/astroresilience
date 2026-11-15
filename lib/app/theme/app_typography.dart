@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// Typography for the "Pressure Suit" design system.
+/// Typography for the "Nile & Gold" design system.
 ///
 /// - IBM Plex Sans: all normal UI text.
 /// - IBM Plex Mono: vital numbers, timestamps and IDs. Mono digits all have
