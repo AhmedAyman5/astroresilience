@@ -127,6 +127,25 @@ class AppTheme {
         ),
       ),
 
+      // Segmented toggles (range, interval, source): selected segment in a
+      // soft orange tint. Not info blue, because blue means WATCH.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? AppColors.tint(AppColors.primary)
+                : Colors.transparent,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.textPrimary,
+          ),
+          side: const WidgetStatePropertyAll(_borderSide),
+          textStyle: WidgetStatePropertyAll(AppTypography.textTheme.labelLarge),
+        ),
+      ),
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,

@@ -5,75 +5,135 @@ import 'package:astroresilience/app/state/earth_link_controller.dart';
 import 'package:astroresilience/core/constants/app_constants.dart';
 import 'package:astroresilience/core/constants/telemetry_constants.dart';
 import 'package:astroresilience/core/models/scenario.dart';
+import 'package:astroresilience/features/dashboard/widgets/risk_gauge.dart';
 import 'package:astroresilience/layers/telemetry/replay_source.dart';
 import 'package:astroresilience/layers/telemetry/telemetry_controller.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('Splash shows, then the shell with 4 tabs and top-bar chips', (
-    tester,
-  ) async {
-    // Phone size from the Definition of Done: 390 x 844.
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'Mission + Vitals render at 390x844 with live data, no overflow',
+    (tester) async {
+      // Phone size from the Definition of Done: 390 x 844. Any RenderFlex
+      // overflow is reported as a FlutterError, which fails this test.
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const AstroResilienceApp());
-    expect(find.text('Initializing edge engine…'), findsOneWidget);
+      await tester.pumpWidget(const AstroResilienceApp());
+      expect(find.text('Initializing edge engine…'), findsOneWidget);
 
-    // Wait for the splash timer and the route transition.
-    await tester.pump(AppConstants.splashDuration);
-    await tester.pumpAndSettle();
+      // Wait for the splash timer and the route transition.
+      await tester.pump(AppConstants.splashDuration);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Mission Dashboard'), findsOneWidget);
-    // Phase 2 debug view: the engine has processed the first reading.
-    // (The engine card is below the fold, hence skipOffstage: false.)
-    expect(find.text('/ 100 RISK SCORE', skipOffstage: false), findsOneWidget);
-    expect(find.text('OFFLINE · EDGE MODE'), findsOneWidget);
-    expect(find.text('EARTH LINK DELAY:'), findsOneWidget);
-    for (final tab in ['Mission', 'Vitals', 'Nutrition', 'Log']) {
-      expect(find.text(tab), findsOneWidget);
-    }
+      // --- Top bar + tabs ---------------------------------------------------
+      expect(find.text('OFFLINE · EDGE MODE'), findsOneWidget);
+      expect(find.text('EARTH LINK DELAY:'), findsOneWidget);
+      for (final tab in ['Mission', 'Vitals', 'Nutrition', 'Log']) {
+        expect(find.text(tab), findsOneWidget);
+      }
 
-    // Switch scenario from the debug dropdown and let 3 minutes pass.
-    await tester.tap(find.text('Nominal'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Hypoxia event').last);
-    await tester.pumpAndSettle();
-    final telemetry = Provider.of<TelemetryController>(
-      tester.element(find.text('Mission Dashboard')),
-      listen: false,
-    );
-    expect(telemetry.scenario, Scenario.hypoxiaEvent);
-    for (var i = 0; i < 36; i++) {
-      await tester.pump(const Duration(seconds: 5));
-    }
+      // --- Mission dashboard, calm start -------------------------------------
+      expect(find.text('MISSION RISK'), findsOneWidget);
+      expect(find.byType(RiskGauge), findsOneWidget);
+      expect(find.byKey(const Key('alertLabel')), findsOneWidget);
+      // Let 1 minute of NOMINAL readings fill the window.
+      await pumpReadings(tester, 12);
+      await scrollThrough(tester, const Key('dashboardList'));
+      expect(find.text('All systems nominal'), findsOneWidget);
+      expect(find.textContaining('BASELINE LEARNING:'), findsOneWidget);
+      expect(find.text('WINDOW: 12/12 READINGS'), findsOneWidget);
+      expect(find.text('Keep the current routine'), findsOneWidget);
 
-    // Scroll to the bottom of the debug view: no overflow at 390 px.
-    await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
-    await tester.pumpAndSettle();
-    expect(find.text('Hypoxia'), findsOneWidget);
-    expect(find.text('CRITICAL'), findsWidgets);
-    expect(find.text('WHY?'), findsWidgets);
+      // --- Demo Control: switch to the hypoxia scenario ---------------------
+      await tester.tap(find.byTooltip('Demo Control'));
+      await tester.pumpAndSettle();
+      expect(find.text('SCENARIO'), findsOneWidget);
+      expect(find.text('Reset session'), findsOneWidget);
+      expect(find.text('Log +600 kcal'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('scenarioDropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hypoxia event').last);
+      await tester.pumpAndSettle();
+      final telemetry = Provider.of<TelemetryController>(
+        tester.element(find.text('SCENARIO')),
+        listen: false,
+      );
+      expect(telemetry.scenario, Scenario.hypoxiaEvent);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      // Back to the top of the dashboard, where the gauge label is.
+      await tester.drag(
+        find.byKey(const Key('dashboardList')),
+        const Offset(0, 5000),
+      );
+      await tester.pumpAndSettle();
 
-    // Switch to the Nutrition tab.
-    await tester.tap(find.text('Nutrition'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Meals recommended from predicted risks.'),
-      findsOneWidget,
-    );
+      // 3 minutes of readings: SpO2 drifts down to CRITICAL. Record every
+      // alert stage shown on the way (WATCH should appear before WARNING).
+      final seen = <String>{};
+      for (var i = 0; i < 36; i++) {
+        await tester.pump(const Duration(seconds: 5));
+        seen.add(tester.widget<Text>(find.byKey(const Key('alertLabel'))).data!);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('alertLabel'))).data,
+        anyOf('WARNING', 'CRITICAL'),
+      );
+      // The prediction stage (WATCH) shows before the thresholds are hit.
+      expect(seen, containsAll(<String>['WATCH', 'WARNING', 'CRITICAL']));
 
-    // Open Demo Control from the top bar.
-    await tester.tap(find.byTooltip('Demo Control'));
-    await tester.pumpAndSettle();
-    expect(find.text('Drive the live demo for the judges.'), findsOneWidget);
+      // Dashboard in the alarm state: scroll through it, open Why? / more.
+      await scrollThrough(tester, const Key('dashboardList'));
+      expect(find.text('TOP PREDICTION'), findsOneWidget);
+      expect(find.text('Hypoxia'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('whyToggle')));
+      await tester.tap(find.byKey(const Key('whyToggle')));
+      await tester.pumpAndSettle();
+      if (find.byKey(const Key('moreToggle')).evaluate().isNotEmpty) {
+        await tester.ensureVisible(find.byKey(const Key('moreToggle')));
+        await tester.tap(find.byKey(const Key('moreToggle')));
+        await tester.pumpAndSettle();
+      }
+      await pumpReadings(tester, 3); // toggles survive new readings
+      await scrollThrough(tester, const Key('dashboardList'));
+      expect(find.text('CRITICAL'), findsWidgets); // SpO2 card + chip
 
-    // Unmount so the Earth-link timer is cancelled before the test ends.
-    await tester.pumpWidget(const SizedBox());
-  });
+      // "See nutrition plan" switches to the Nutrition tab.
+      await tester.ensureVisible(find.text('See nutrition plan'));
+      await tester.tap(find.text('See nutrition plan'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Meals recommended from predicted risks.'),
+        findsOneWidget,
+      );
+
+      // --- Vitals tab: every range, scrolled to the bottom ------------------
+      await tester.tap(find.text('Vitals'));
+      await tester.pumpAndSettle();
+      expect(find.text('HEART RATE · BPM'), findsOneWidget);
+      expect(find.byType(LineChart), findsWidgets);
+      for (final range in ['2 min', '10 min', 'Session']) {
+        await tester.drag(
+          find.byKey(const Key('vitalsList')),
+          const Offset(0, 3000),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(range));
+        await pumpReadings(tester, 2);
+        await scrollThrough(tester, const Key('vitalsList'));
+      }
+      expect(find.text('ACTIVITY · LEVEL'), findsOneWidget);
+
+      // Unmount so the timers are cancelled before the test ends.
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test('Earth link delay stays within 4–24 minutes', () {
     final controller = EarthLinkController(
@@ -108,4 +168,21 @@ void main() {
     }
     expect(replay.next(now, const Duration(seconds: 5)), first); // looped
   });
+}
+
+/// Lets [count] readings arrive (default interval 5 s) and settles.
+Future<void> pumpReadings(WidgetTester tester, int count) async {
+  for (var i = 0; i < count; i++) {
+    await tester.pump(const Duration(seconds: 5));
+  }
+  await tester.pumpAndSettle();
+}
+
+/// Scrolls a list from top to bottom in steps so every child gets built and
+/// laid out (an overflow anywhere fails the test), then back to the top.
+Future<void> scrollThrough(WidgetTester tester, Key list) async {
+  for (var i = 0; i < 12; i++) {
+    await tester.drag(find.byKey(list), const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
 }

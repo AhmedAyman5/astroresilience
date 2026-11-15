@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
@@ -56,12 +57,23 @@ class TelemetryController extends ChangeNotifier {
   bool _loadingSource = false;
   String? _sourceError;
   int _sessionId = 0;
+  int _revision = 0;
 
   /// Every new reading, for the engine and other layers.
   Stream<VitalReading> get readings => _out.stream;
 
   /// Readings of this session, oldest first.
   List<VitalReading> get history => List.unmodifiable(_history);
+
+  /// Read-only view of the history WITHOUT copying it (charts read this on
+  /// every tick; copying up to 1000 readings each time would be wasteful).
+  UnmodifiableListView<VitalReading> get historyView =>
+      UnmodifiableListView(_history);
+
+  /// Goes up by one for every new reading (and on reset). Widgets select on
+  /// it so they rebuild only when the data really changed — not when, for
+  /// example, only the scenario name changed.
+  int get revision => _revision;
   VitalReading? get latest => _history.isEmpty ? null : _history.last;
 
   Duration get interval => _interval;
@@ -146,6 +158,7 @@ class TelemetryController extends ChangeNotifier {
     _simulated.reset();
     _replay.reset();
     _sessionId++;
+    _revision++;
     notifyListeners();
     if (_running) _subscribe(emitNow: true);
   }
@@ -162,6 +175,7 @@ class TelemetryController extends ChangeNotifier {
   void _onReading(VitalReading reading) {
     _history.add(reading);
     if (_history.length > TelemetryConstants.maxHistory) _history.removeAt(0);
+    _revision++;
     _out.add(reading);
     notifyListeners();
   }

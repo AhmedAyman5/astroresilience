@@ -31,6 +31,7 @@ class AppSpacing {
   /// Size of the logo on the splash screen.
   static const double splashLogo = 112;
 
-  /// Max content width so the layout stays readable on wide (web) screens.
-  static const double maxContentWidth = 720;
+  /// Max app width. On wide (desktop web) windows the app stays centered at
+  /// this width so it still looks like a phone app (see PhoneFrame).
+  static const double maxContentWidth = 520;
 }

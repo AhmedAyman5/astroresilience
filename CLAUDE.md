@@ -155,7 +155,7 @@ Shapes and layout:
 ## 11. Progress Log
 - [x] Phase 1 — Environment, project setup, theme, app shell
 - [x] Phase 2 — Telemetry simulator + Edge AI engine + tests
-- [ ] Phase 3 — Dashboard + Vitals screens
+- [x] Phase 3 — Dashboard + Vitals screens
 - [ ] Phase 4 — Nutrition loop + security + Mission Log
 - [ ] Phase 5 — Demo Control, icons, GitHub Actions APK, README, final QA
 
@@ -182,3 +182,15 @@ Notes:
   - Temporary debug view: features/dashboard/engine_debug_view.dart (scenario dropdown, interval, source, reset, "+600 kcal" test meal, live reading, score, baseline, predictions with Why). It gets replaced in Phase 3/5.
   - Tests: 59 passing, including end-to-end runs of each scenario with seeded randoms, and NOMINAL/RECOVERY checked over 10 minutes × 5 seeds for false alarms. Shared helpers in test/helpers.dart.
   - Known: SegmentedButton uses the theme's secondary (info blue) for its selected segment. That is fine for the temporary view; Phase 5 Demo Control should style it orange.
+- 2026-11-11 Phase 3 done. No new packages.
+  - Debug controls moved to Demo Control (scenario, interval, source + replay file/row/bad rows, reset session, "+600 kcal" test meal). engine_debug_view.dart deleted.
+  - Dashboard: RiskGauge (CustomPainter, 240° arc, dim NORMAL/WARNING/CRITICAL bands, animated with TweenAnimationBuilder 0.9 s), 5 VitalCards (2 columns, Activity full width, sparkline of the last 12, trend arrow, status dot + text), PredictionCard ("Why?" and "+N more" toggles, kept open across readings), "All systems nominal" calm card, ActionCard ("See nutrition plan" switches tab), footer with baseline learning UPDATED/PAUSED + window N/12 + baseline values.
+  - AlertLevel (core/models/alert_level.dart) adds WATCH = status NORMAL with predictions. WATCH = info blue + radar icon. The widget test checks that WATCH, WARNING and CRITICAL all appear during the hypoxia ramp.
+  - Vital card status (core/utils/vital_analysis.dart) uses the average of the last 3 readings, like the engine. HR counts only at LOW activity. HRV is compared with the learned baseline. Trend arrows have dead bands (ui_constants.dart) so noise does not flip them.
+  - Vitals tab: one fl_chart per vital, dashed warning/critical lines with labels (HRV lines move with the baseline), range 2 min / 10 min / Session, current + min/max/avg, activity as a step chart with a shaded band (plus % time per level). x = seconds since session start, so the 300 ms animation looks like a smooth scroll.
+  - Rebuilds: TelemetryController gained `revision` (increments per reading) and `historyView` (no copy). Cards and charts select on revision. Charts are wrapped in RepaintBoundary.
+  - ShellNavigation (app/state) holds the open tab. PhoneFrame (MaterialApp.builder) centers the app at max 520 px on wide windows. maxContentWidth was 720, now 520.
+  - The segmented-button theme now uses an orange tint (blue now means WATCH). This was planned for Phase 5 and was done early.
+  - layers/nutrition/action_advisor.dart: non-food action per risk (rest / hydrate / reduce activity / breathing / routine). Phase 4 builds on it.
+  - Tests: 67 passing. widget_test renders Mission + Vitals at 390x844 with NOMINAL, then HYPOXIA_EVENT for 3 min. It scrolls every list and fails on any overflow. New test/ui/vital_analysis_test.dart.
+  - Chrome check (build/web on localhost): no app console errors and no network requests.

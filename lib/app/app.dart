@@ -7,7 +7,9 @@ import '../layers/nutrition/energy_balance_service.dart';
 import '../layers/telemetry/telemetry_controller.dart';
 import 'routes.dart';
 import 'state/earth_link_controller.dart';
+import 'state/shell_navigation.dart';
 import 'theme/app_theme.dart';
+import 'widgets/phone_frame.dart';
 
 /// Root widget: registers app-wide state (providers) and the theme.
 class AstroResilienceApp extends StatelessWidget {
@@ -19,6 +21,8 @@ class AstroResilienceApp extends StatelessWidget {
       providers: [
         // Simulated Earth ↔ Mars delay shown in the top bar.
         ChangeNotifierProvider(create: (_) => EarthLinkController()),
+        // Which bottom tab is open (lets the dashboard jump to Nutrition).
+        ChangeNotifierProvider(create: (_) => ShellNavigation()),
         // Layer 1: telemetry. lazy: false = starts with the app, so readings
         // are already flowing while the splash screen is shown.
         ChangeNotifierProvider(
@@ -45,6 +49,8 @@ class AstroResilienceApp extends StatelessWidget {
         themeMode: ThemeMode.dark,
         initialRoute: AppRoutes.splash,
         routes: AppRoutes.table,
+        // Phone-shaped, centered layout on wide desktop windows.
+        builder: (context, child) => PhoneFrame(child: child!),
       ),
     );
   }

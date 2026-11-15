@@ -1,24 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/log/mission_log_screen.dart';
 import '../../features/nutrition/nutrition_screen.dart';
 import '../../features/vitals/vitals_screen.dart';
+import '../state/shell_navigation.dart';
 import 'top_bar.dart';
 
 /// Main app frame: top bar + 4 tabs + bottom navigation.
 ///
 /// Tabs are kept alive in an [IndexedStack] so switching tabs does not reset
-/// charts or scroll positions.
-class AppShell extends StatefulWidget {
+/// charts or scroll positions. The open tab lives in [ShellNavigation], so
+/// other screens can switch tabs too.
+class AppShell extends StatelessWidget {
   const AppShell({super.key});
-
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<AppShell> {
-  int _index = 0;
 
   static const List<Widget> _tabs = [
     DashboardScreen(),
@@ -29,9 +25,11 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final nav = context.watch<ShellNavigation>();
+    final index = nav.tab.index;
     return Scaffold(
       appBar: const TopBar(),
-      body: IndexedStack(index: _index, children: _tabs),
+      body: IndexedStack(index: index, children: _tabs),
       bottomNavigationBar: DecoratedBox(
         // 1px top border instead of a shadow (design system rule).
         decoration: BoxDecoration(
@@ -40,8 +38,8 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
         child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          selectedIndex: index,
+          onDestinationSelected: (i) => nav.open(AppTab.values[i]),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.space_dashboard_outlined),
